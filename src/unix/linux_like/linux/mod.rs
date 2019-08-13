@@ -14,6 +14,7 @@ pub type nl_item = ::c_int;
 pub type idtype_t = ::c_uint;
 pub type loff_t = ::c_longlong;
 pub type pthread_key_t = ::c_uint;
+pub type __cpu_mask = ::c_ulong;
 
 pub type __u8 = ::c_uchar;
 pub type __u16 = ::c_ushort;
@@ -2277,6 +2278,35 @@ f! {
 
     pub fn RT_LOCALADDR(flags: u32) -> bool {
         (flags & RTF_ADDRCLASSMASK) == (RTF_LOCAL | RTF_INTERFACE)
+    }
+}
+
+cfg_if! {
+    if #[cfg(not(target_env = "musl"))] {
+        f! {
+            pub fn CPU_COUNT(cpuset: &cpu_set_t) -> ::c_int {
+                let mut s: u32 = 0;
+                let setsize = ::mem::size_of::<cpu_set_t>();
+                let cpu_mask_size = ::mem::size_of::<__cpu_mask>();
+                for i in cpuset.bits[..(setsize / cpu_mask_size)].iter() {
+                    s += i.count_ones()
+                };
+                s as ::c_int
+            }
+        }
+    } else {
+        pub fn CPU_COUNT(cpuset: &cpu_set_t) -> ::c_int {
+            let mut s: ::c_int = 0;
+            let setsize = ::mem::size_of::<cpu_set_t>();
+            for i in 0 .. setsize {
+                for j in 0 .. 8 {
+                    if cpuset.bits[i] & (i<<j) {
+                        s += 1;
+                    }
+                }
+            }
+            s
+        }
     }
 }
 
